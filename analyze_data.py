@@ -22,6 +22,7 @@ from shared import *
 
 # https://www.kaggle.com/kobakhit/grupo-bimbo-inventory-demand/xgboost
 
+
 def nl():
     print('\n')
 
@@ -59,9 +60,15 @@ def get_product_agg(df_train, cols):
 
 def train_analysis():
     # I want to investigate how demand changes based on the weeks
-    df_train = pd.read_csv(TRAINING_CSV, nrows=20000000)
-    agg = get_product_agg(df_train, ['Demanda_uni_equil',])
+    # df_train = pd.read_csv(TRAINING_CSV, nrows=20000000)
+    # agg = get_product_agg(df_train, ['Demanda_uni_equil',])
     
+    df_train = pd.read_csv(TRAINING_CSV, nrows=200000)
+    demand_median_df  = df_train.groupby(['Cliente_ID',], as_index=False)['Demanda_uni_equil'].median()
+    demand_median_df.columns = ['Cliente_ID','Demanda_uni_equil_median',]
+    print(demand_median_df.head())
+        
+    print(df_train.head())
     
 
 def view_train_rows(n=20):
@@ -125,8 +132,8 @@ def analyze_products():
                                pd.DataFrame(product_bag_words, 
                                             columns= vectorizer.get_feature_names(), index = products.index)], axis=1).to_sparse()
     
-    print(products_bagofwords.shape)
-    print(products.describe())
+    #print(products_bagofwords.shape)
+    #print(products.describe())
     
     return products
 
@@ -164,19 +171,32 @@ def create_features():
             first = False
         else:
             features.to_csv(FEATURE_CSV, mode='a', header=False)
+    """
     
     df_train = pd.read_csv(TRAINING_CSV)
+    
+    # calculate the median demand from a client
+    median_demand = df_train['Demanda_uni_equil'].median()
+    demand_median_df  = df_train.groupby(['Cliente_ID',], as_index=False)['Demanda_uni_equil'].median()
+    demand_median_df.columns = ['Cliente_ID','Demanda_uni_equil_median',]
+    
     #df_train = pd.merge(products_bagofwords, df_train, on='Producto_ID')
     df_train = pd.merge(products.get(PRODUCT_FEATURE_COLUMNS + ['short_name_encoded',]), df_train, on='Producto_ID')
     df_train = pd.merge(cs_df.get(CITY_STATE_FEATURE_COLUMNS + ['Agencia_ID',]), df_train, on='Agencia_ID')
+    df_train = pd.merge(df_train, demand_median_df, on='Cliente_ID')
     
     df_train.get(TOTAL_TRAINING_FEATURE_COLUMNS + TARGET_COLUMN).to_csv(TRAIN_FEATURES_CSV, index=False)
-    """
+    
     df_test = pd.read_csv(TEST_CSV)
+    
     df_test = pd.merge(products.get(PRODUCT_FEATURE_COLUMNS + ['short_name_encoded',]), df_test, on='Producto_ID')
     df_test = pd.merge(cs_df.get(CITY_STATE_FEATURE_COLUMNS + ['Agencia_ID',]), df_test, on='Agencia_ID')
+    df_test = pd.merge(df_test, demand_median_df, on='Cliente_ID', how='left')
+    df_test['Demanda_uni_equil_median'] = df_test['Demanda_uni_equil_median'].fillna(median_demand)
+    
     df_test.get(TOTAL_TEST_FEATURE_COLUMNS).to_csv(TEST_FEATURES_CSV, index=False)
-
+    print(df_test.shape)
+    
 
 def test_pd():
     client_one  =  pd.read_csv(CLIENT_CSV)
@@ -209,13 +229,14 @@ def compare_product_lists():
 
 if __name__ == "__main__":
     #list_files()
-    train_test_analyze()
+    #train_test_analyze()
     #view_train_rows()
     #view_target()
+    #train_analysis()
     
     #analyze_products()
     #analyze_city_state()
     #test_pd()
     #compare_product_lists()
     
-    #create_features()
+    create_features()

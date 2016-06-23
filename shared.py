@@ -11,7 +11,7 @@ TRAIN_FEATURES_CSV = DATA_DIR + 'train_features.csv'
 TEST_FEATURES_CSV = DATA_DIR + 'test_features.csv'
 FEATURE_PKL = DATA_DIR + 'features.pkl'
 
-TRAINING_FEATURE_COLUMNS = ['Semana', 'Canal_ID', 'Ruta_SAK', 'Cliente_ID', 'Producto_ID']
+TRAINING_FEATURE_COLUMNS = ['Semana', 'Canal_ID', 'Ruta_SAK', 'Cliente_ID', 'Producto_ID', 'Demanda_uni_equil_median']
 PRODUCT_FEATURE_COLUMNS = ['Producto_ID', 'weight', 'brand_encoded', 'pieces']
 CITY_STATE_FEATURE_COLUMNS = ['city_state_encoded', 'state_encoded']
 TOTAL_TRAINING_FEATURE_COLUMNS = list(set(TRAINING_FEATURE_COLUMNS + ['short_name_encoded',] + PRODUCT_FEATURE_COLUMNS + CITY_STATE_FEATURE_COLUMNS))
