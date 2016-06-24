@@ -50,6 +50,9 @@ def train_test_analyze():
     print(df_train.describe())
     print(df_test.describe())
 
+    nl()
+    print(df_train.head())
+
 
 def get_product_agg(df_train, cols):
     agg  = df_train.groupby(['Semana', 'Producto_ID'], as_index=False).agg(['count','sum', 'min', 'max','median','mean'])
@@ -64,10 +67,11 @@ def train_analysis():
     # agg = get_product_agg(df_train, ['Demanda_uni_equil',])
     
     df_train = pd.read_csv(TRAINING_CSV, nrows=200000)
-    demand_median_df  = df_train.groupby(['Cliente_ID',], as_index=False)['Demanda_uni_equil'].median()
-    demand_median_df.columns = ['Cliente_ID','Demanda_uni_equil_median',]
+    demand_median_df  = df_train.groupby(['Cliente_ID','Producto_ID'], as_index=False)['Demanda_uni_equil'].median()
+    demand_median_df.columns = ['Cliente_ID','Producto_ID','Demanda_uni_equil_median',]
     print(demand_median_df.head())
-        
+    
+    df_train = pd.merge(df_train, demand_median_df, on=['Cliente_ID', 'Producto_ID'])
     print(df_train.head())
     
 
@@ -124,8 +128,10 @@ def analyze_products():
     
     # fill in the nan values with the mean of the column
     products['pieces'] = products['pieces'].fillna(1)
+    
     # this was not an improvement
     # products.loc[np.isnan(products['weight']), 'weight'] = products.loc[np.isnan(products['weight']), 'avg_brand_weight'] 
+    
     products = products.fillna(products.mean())
     
     products_bagofwords = pd.concat([products.get(PRODUCT_FEATURE_COLUMNS), 
@@ -144,17 +150,26 @@ def analyze_city_state():
     cs_df['state_encoded'] = LabelEncoder().fit_transform(cs_df['State'])
     
     return cs_df
+
     
+def create_features(load_from_pkl=True):
     
-def create_features():
+    # get the products dateframe
+    if load_from_pkl:
+        products = pd.read_pickle(PRODUCTS_PKL)
+    else:
+        products = analyze_products()
+        products.to_pickle(PRODUCTS_PKL)
     
-    products = analyze_products()
-    
-    cs_df = analyze_city_state()
-    
-    # now I want to attach the averge value (in pesos per item) using the sales data of the training set
-    
+    # get the city/state dataframe
+    if load_from_pkl:
+        cs_df = pd.read_pickle(CITY_STATE_PKL)
+    else:
+        cs_df = analyze_city_state()
+        cs_df.to_pickle(CITY_STATE_PKL)
+
     """
+    # read in s
     df_train = pd.read_csv(TRAINING_CSV, iterator=True, chunksize=200000)
     
     first = True
@@ -173,30 +188,65 @@ def create_features():
             features.to_csv(FEATURE_CSV, mode='a', header=False)
     """
     
-    df_train = pd.read_csv(TRAINING_CSV)
+    # Gets the training data, I'm setting the dtype to use less memory
+    df_train = pd.read_csv(TRAINING_CSV, 
+        dtype  = {'Semana': 'int8',
+                  'Agencia_ID':'int32',
+                  'Canal_ID': 'int32',
+                  'Ruta_SAK':'int32',
+                  'Cliente_ID':'int32',
+                  'Producto_ID':'int32',
+                  'Demanda_uni_equil':'int32'})
     
     # calculate the median demand from a client
-    median_demand = df_train['Demanda_uni_equil'].median()
-    demand_median_df  = df_train.groupby(['Cliente_ID',], as_index=False)['Demanda_uni_equil'].median()
-    demand_median_df.columns = ['Cliente_ID','Demanda_uni_equil_median',]
+    median_demand = df_train['Demanda_uni_equil'].median()    
+    if load_from_pkl:
+        demand_cust_median_df = pd.read_pickle(FULL_TRAIN_DEMAND_CUST_MEDIAN_PKL)
+    else:
+        demand_cust_median_df  = df_train.groupby(['Cliente_ID',], as_index=False)['Demanda_uni_equil'].median()
+        demand_cust_median_df.columns = ['Cliente_ID','Demanda_uni_equil_median',]
+        demand_cust_median_df.to_pickle(FULL_TRAIN_DEMAND_CUST_MEDIAN_PKL)
     
+    # calculate the median demand from a client/product
+    if load_from_pkl:
+        demand_cust_prod_median_df = pd.read_pickle(FULL_TRAIN_DEMAND_CUST_PROD_MEDIAN_PKL)
+    else:
+        demand_cust_prod_median_df  = df_train.groupby(['Cliente_ID','Producto_ID'], as_index=False)['Demanda_uni_equil'].median()
+        demand_cust_prod_median_df.columns = ['Cliente_ID','Producto_ID','Demanda_uni_equil_median_prod',]
+        demand_cust_prod_median_df.to_pickle(FULL_TRAIN_DEMAND_CUST_PROD_MEDIAN_PKL)
+    
+    # create the training set dataframe
     #df_train = pd.merge(products_bagofwords, df_train, on='Producto_ID')
     df_train = pd.merge(products.get(PRODUCT_FEATURE_COLUMNS + ['short_name_encoded',]), df_train, on='Producto_ID')
     df_train = pd.merge(cs_df.get(CITY_STATE_FEATURE_COLUMNS + ['Agencia_ID',]), df_train, on='Agencia_ID')
-    df_train = pd.merge(df_train, demand_median_df, on='Cliente_ID')
+    df_train = pd.merge(df_train, demand_cust_median_df, on='Cliente_ID')
+    df_train = pd.merge(df_train, demand_cust_prod_median_df, on=['Cliente_ID', 'Producto_ID'])
     
     df_train.get(TOTAL_TRAINING_FEATURE_COLUMNS + TARGET_COLUMN).to_csv(TRAIN_FEATURES_CSV, index=False)
     
-    df_test = pd.read_csv(TEST_CSV)
+    # Gets the test data, I'm setting the dtype to use less memory
+    df_test = pd.read_csv(TEST_CSV, 
+        dtype  = {'id': 'int32',
+                  'Semana': 'int8',
+                  'Agencia_ID':'int32',
+                  'Canal_ID': 'int32',
+                  'Ruta_SAK':'int32',
+                  'Cliente_ID':'int32',
+                  'Producto_ID':'int32'})
     
+    # create the test set dataframe
     df_test = pd.merge(products.get(PRODUCT_FEATURE_COLUMNS + ['short_name_encoded',]), df_test, on='Producto_ID')
     df_test = pd.merge(cs_df.get(CITY_STATE_FEATURE_COLUMNS + ['Agencia_ID',]), df_test, on='Agencia_ID')
-    df_test = pd.merge(df_test, demand_median_df, on='Cliente_ID', how='left')
+    
+    df_test = pd.merge(df_test, demand_cust_median_df, on='Cliente_ID', how='left')
     df_test['Demanda_uni_equil_median'] = df_test['Demanda_uni_equil_median'].fillna(median_demand)
+    
+    df_test = pd.merge(df_test, demand_cust_prod_median_df, on=['Cliente_ID', 'Producto_ID'], how='left')
+    df_test.loc[np.isnan(df_test['Demanda_uni_equil_median_prod']), 'Demanda_uni_equil_median_prod'] = df_test.loc[np.isnan(df_test['Demanda_uni_equil_median_prod']), 'Demanda_uni_equil_median'] 
     
     df_test.get(TOTAL_TEST_FEATURE_COLUMNS).to_csv(TEST_FEATURES_CSV, index=False)
     print(df_test.shape)
-    
+
 
 def test_pd():
     client_one  =  pd.read_csv(CLIENT_CSV)
@@ -229,7 +279,7 @@ def compare_product_lists():
 
 if __name__ == "__main__":
     #list_files()
-    #train_test_analyze()
+    train_test_analyze()
     #view_train_rows()
     #view_target()
     #train_analysis()
@@ -239,4 +289,4 @@ if __name__ == "__main__":
     #test_pd()
     #compare_product_lists()
     
-    create_features()
+    #create_features()

@@ -6,3 +6,7 @@
 /town_state.csv
 /train_features.csv
 /train.csv
+/city_state.pkl
+/products.pkl
+/full_train_demand_cust_med.pkl
+/full_train_demand_cust_prod_med.pkl
