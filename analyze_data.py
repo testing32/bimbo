@@ -8,6 +8,8 @@ import sys
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.preprocessing import LabelEncoder
 
+import xgboost as xgb
+
 from nltk.corpus import stopwords
 from nltk.stem.snowball import SnowballStemmer
 from nltk.tokenize import WhitespaceTokenizer
@@ -199,7 +201,7 @@ def create_features(load_from_pkl=True):
                   'Demanda_uni_equil':'int32'})
     
     # calculate the median demand from a client
-    median_demand = df_train['Demanda_uni_equil'].median()    
+    median_demand = df_train['Demanda_uni_equil'].median()
     if load_from_pkl:
         demand_cust_median_df = pd.read_pickle(FULL_TRAIN_DEMAND_CUST_MEDIAN_PKL)
     else:
@@ -215,12 +217,30 @@ def create_features(load_from_pkl=True):
         demand_cust_prod_median_df.columns = ['Cliente_ID','Producto_ID','Demanda_uni_equil_median_prod',]
         demand_cust_prod_median_df.to_pickle(FULL_TRAIN_DEMAND_CUST_PROD_MEDIAN_PKL)
     
+    """
+    # the median returns doesn't help
+    median_returns = df_train['Dev_uni_proxima'].median()
+    returns_cust_median_df  = df_train.groupby(['Cliente_ID',], as_index=False)['Dev_uni_proxima'].median()
+    returns_cust_median_df.columns = ['Cliente_ID','Dev_uni_proxima_median',] 
+    
+    # this doesn't help either
+    # add sales from previous week information, per customer, per product
+    demand_cust_week_prod_median_df  = df_train.groupby(['Cliente_ID','Semana','Producto_ID'], as_index=False)['Demanda_uni_equil'].median()
+    demand_cust_week_prod_median_df.columns = ['Cliente_ID','Semana','Producto_ID','Demanda_uni_equil_median_cust_week_prod',]
+    demand_cust_week_prod_median_df['Semana'] = demand_cust_week_prod_median_df['Semana'] + 1
+    """
+    
     # create the training set dataframe
     #df_train = pd.merge(products_bagofwords, df_train, on='Producto_ID')
     df_train = pd.merge(products.get(PRODUCT_FEATURE_COLUMNS + ['short_name_encoded',]), df_train, on='Producto_ID')
     df_train = pd.merge(cs_df.get(CITY_STATE_FEATURE_COLUMNS + ['Agencia_ID',]), df_train, on='Agencia_ID')
     df_train = pd.merge(df_train, demand_cust_median_df, on='Cliente_ID')
     df_train = pd.merge(df_train, demand_cust_prod_median_df, on=['Cliente_ID', 'Producto_ID'])
+    # df_train = pd.merge(df_train, returns_cust_median_df, on='Cliente_ID')
+    
+    #df_train = pd.merge(df_train, demand_cust_week_prod_median_df, on=['Cliente_ID', 'Semana', 'Producto_ID'], how='left')
+    #df_train.loc[np.isnan(df_train['Demanda_uni_equil_median_cust_week_prod']), 'Demanda_uni_equil_median_cust_week_prod'] = df_train.loc[np.isnan(df_train['Demanda_uni_equil_median_cust_week_prod']), 'Demanda_uni_equil_median_prod'] 
+    
     
     df_train.get(TOTAL_TRAINING_FEATURE_COLUMNS + TARGET_COLUMN).to_csv(TRAIN_FEATURES_CSV, index=False)
     
@@ -243,6 +263,12 @@ def create_features(load_from_pkl=True):
     
     df_test = pd.merge(df_test, demand_cust_prod_median_df, on=['Cliente_ID', 'Producto_ID'], how='left')
     df_test.loc[np.isnan(df_test['Demanda_uni_equil_median_prod']), 'Demanda_uni_equil_median_prod'] = df_test.loc[np.isnan(df_test['Demanda_uni_equil_median_prod']), 'Demanda_uni_equil_median'] 
+    
+    # df_test = pd.merge(df_test, returns_cust_median_df, on='Cliente_ID', how='left')
+    # df_test['Dev_uni_proxima_median'] = df_test['Dev_uni_proxima_median'].fillna(median_returns)
+    
+    # df_test = pd.merge(df_test, demand_cust_week_prod_median_df, on=['Cliente_ID', 'Semana', 'Producto_ID'], how='left')
+    # df_test.loc[np.isnan(df_test['Demanda_uni_equil_median_cust_week_prod']), 'Demanda_uni_equil_median_cust_week_prod'] = df_test.loc[np.isnan(df_test['Demanda_uni_equil_median_cust_week_prod']), 'Demanda_uni_equil_median_prod']
     
     df_test.get(TOTAL_TEST_FEATURE_COLUMNS).to_csv(TEST_FEATURES_CSV, index=False)
     print(df_test.shape)
@@ -279,7 +305,7 @@ def compare_product_lists():
 
 if __name__ == "__main__":
     #list_files()
-    train_test_analyze()
+    #train_test_analyze()
     #view_train_rows()
     #view_target()
     #train_analysis()
@@ -289,4 +315,4 @@ if __name__ == "__main__":
     #test_pd()
     #compare_product_lists()
     
-    #create_features()
+    create_features()

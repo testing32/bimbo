@@ -17,7 +17,7 @@ def root_mean_squared_logarithmic_error_loss_func(ground_truths, predictions):
     print(diff, n, np.sum(diff))
     return np.sqrt(np.sum(diff)/n)
 
-def predict():
+def predict_linear():
     training = pd.read_csv(TRAIN_FEATURES_CSV)
     
     loss = make_scorer(root_mean_squared_logarithmic_error_loss_func, greater_is_better=False)
@@ -43,7 +43,8 @@ def predict():
     submission.to_csv(PREDICTION_CSV, index=False, cols=['id', 'Demanda_uni_equil'])
 
 if __name__ == "__main__":
-    predict()
+    # predict_linear()
+    predict_xgboost()
     
     sub_df = pd.read_csv(PREDICTION_CSV)
     print(sub_df.shape)
