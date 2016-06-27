@@ -42,6 +42,41 @@ def predict_linear():
     submission.loc[submission['Demanda_uni_equil'] < 0,'Demanda_uni_equil'] = 0
     submission.to_csv(PREDICTION_CSV, index=False, cols=['id', 'Demanda_uni_equil'])
 
+def predict_xgboost():
+    
+    import xgboost as xgb
+    
+    training = pd.read_csv(TRAIN_FEATURES_CSV)
+    test = pd.read_csv(TEST_FEATURES_CSV)
+    
+    params = {"objective": "binary:linear",
+          "booster" : "gbtree",
+          'eval_metric': 'ndcg',
+          'lambda': 1,
+          'alpha': 0,
+          "eta": 0.01,
+          "gamma": .5,
+          "max_depth": 4,
+          "subsample": 0.7,
+          "colsample_bytree": 0.4,
+          "min_child_weight": 7,
+          "silent": 1,
+          "thread": -1,
+          "nthread": 20,
+          "seed": 1301
+          } # 0.873502225    0.946107784    0.580526638    0.719544592
+
+    
+    num_boost_round = 2000
+    cv_num_round = 2
+
+    dtrain = xgb.DMatrix(x, label=y)
+    watchlist  = [(dtrain,'train')]
+    
+    results = xgb.cv(params, dtrain, num_boost_round, nfold=10,
+       metrics={'error'}, seed = 0, fpreproc = fpreproc, show_progress = False)
+    
+
 if __name__ == "__main__":
     # predict_linear()
     predict_xgboost()
