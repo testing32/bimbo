@@ -134,8 +134,12 @@ def create_features(load_from_pkl=True):
     if load_from_pkl:
         demand_cust_prod_median_df = pd.read_pickle(FULL_TRAIN_DEMAND_CUST_PROD_MEDIAN_PKL)
     else:
-        demand_cust_prod_median_df  = get_median_cust_demand_df(df_train)
+        demand_cust_prod_median_df  = get_median_cust_prod_demand_df(df_train)
         demand_cust_prod_median_df.to_pickle(FULL_TRAIN_DEMAND_CUST_PROD_MEDIAN_PKL)
+        
+    demand_agen_median_df = get_median_agen_demand_df(df_train)
+    demand_agen_prod_median_df = get_median_agen_prod_demand_df(df_train)
+    demand_cust_prod_agen_median_df = get_median_cust_prod_agen_demand_df(df_train)
     
     """
     # the median returns doesn't help
@@ -150,8 +154,8 @@ def create_features(load_from_pkl=True):
     demand_cust_week_prod_median_df['Semana'] = demand_cust_week_prod_median_df['Semana'] + 1
     """
     
-    # create the training set dataframe
-    df_train = combine_dataframes(df_train, products, cs_df, demand_cust_median_df, demand_cust_prod_median_df, median_demand)
+    # load the dataframes with the new meta data
+    df_train = combine_dataframes(df_train, products, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, median_demand)
     df_train.get(TOTAL_TRAINING_FEATURE_COLUMNS + TARGET_COLUMN).to_csv(TRAIN_FEATURES_CSV, index=False)
     
     # Gets the test data, I'm setting the dtype to use less memory
@@ -165,7 +169,7 @@ def create_features(load_from_pkl=True):
                   'Producto_ID':'int32'})
     
     # create the test set dataframe
-    df_test = combine_dataframes(df_test, products, cs_df, demand_cust_median_df, demand_cust_prod_median_df, median_demand)
+    df_test = combine_dataframes(df_test, products, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, median_demand)
     df_test.get(TOTAL_TEST_FEATURE_COLUMNS).to_csv(TEST_FEATURES_CSV, index=False)
     
     print(df_test.shape)
@@ -207,9 +211,9 @@ if __name__ == "__main__":
     #view_target()
     #train_analysis()
     
-    analyze_products()
+    #analyze_products()
     #analyze_city_state()
     #test_pd()
     #compare_product_lists()
     
-    #create_features()
+    create_features(load_from_pkl=False)
