@@ -97,10 +97,12 @@ def predict_train_test(df_train, df_test, model_prediction=predict_linear):
     demand_agen_median_df = get_median_agen_demand_df(df_train)
     demand_agen_prod_median_df = get_median_agen_prod_demand_df(df_train)
     demand_cust_prod_agen_median_df = get_median_cust_prod_agen_demand_df(df_train)
+    demand_semana_agen_median_df = get_previous_week_agen_demand_df(df_train)
+    demand_semana_agen_prod_median_df = get_previous_week_agen_prod_demand_df(df_train)
     
     # load the dataframes with the new meta data
-    df_train = combine_dataframes(df_train, products_df, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, median_demand)
-    df_test = combine_dataframes(df_test, products_df, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, median_demand)
+    df_train = combine_dataframes(df_train, products_df, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, demand_semana_agen_median_df, demand_semana_agen_prod_median_df, median_demand)
+    df_test = combine_dataframes(df_test, products_df, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, demand_semana_agen_median_df, demand_semana_agen_prod_median_df, median_demand)
             
     # cap the prediction to 10
     CAP_PREDICTION_VALUE = 10

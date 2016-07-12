@@ -122,8 +122,10 @@ def create_features(load_from_pkl=True):
                   'Producto_ID':'int32',
                   'Demanda_uni_equil':'int32'})
     
-    # calculate the median demand from a client
+    # calculate the median demand
     median_demand = df_train['Demanda_uni_equil'].median()
+    
+    # calculate the median demand from a client
     if load_from_pkl:
         demand_cust_median_df = pd.read_pickle(FULL_TRAIN_DEMAND_CUST_MEDIAN_PKL)
     else:
@@ -136,10 +138,21 @@ def create_features(load_from_pkl=True):
     else:
         demand_cust_prod_median_df  = get_median_cust_prod_demand_df(df_train)
         demand_cust_prod_median_df.to_pickle(FULL_TRAIN_DEMAND_CUST_PROD_MEDIAN_PKL)
-        
+    
+    # calculate the median agency demand
     demand_agen_median_df = get_median_agen_demand_df(df_train)
+    
+    # calculate the median agency/product/demand
     demand_agen_prod_median_df = get_median_agen_prod_demand_df(df_train)
+    
+    # calculate the median customer/product/agency/demand
     demand_cust_prod_agen_median_df = get_median_cust_prod_agen_demand_df(df_train)
+    
+    # calculate the previous weeks agency demand
+    demand_semana_agen_median_df = get_previous_week_agen_demand_df(df_train)
+    
+    # calculate the previous weeks agency/product demand
+    demand_semana_agen_prod_median_df = get_previous_week_agen_prod_demand_df(df_train)
     
     """
     # the median returns doesn't help
@@ -155,7 +168,7 @@ def create_features(load_from_pkl=True):
     """
     
     # load the dataframes with the new meta data
-    df_train = combine_dataframes(df_train, products, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, median_demand)
+    df_train = combine_dataframes(df_train, products, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, demand_semana_agen_median_df, demand_semana_agen_prod_median_df, median_demand)
     df_train.get(TOTAL_TRAINING_FEATURE_COLUMNS + TARGET_COLUMN).to_csv(TRAIN_FEATURES_CSV, index=False)
     
     # Gets the test data, I'm setting the dtype to use less memory
@@ -169,7 +182,7 @@ def create_features(load_from_pkl=True):
                   'Producto_ID':'int32'})
     
     # create the test set dataframe
-    df_test = combine_dataframes(df_test, products, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, median_demand)
+    df_test = combine_dataframes(df_test, products, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, demand_semana_agen_median_df, demand_semana_agen_prod_median_df, median_demand)
     df_test.get(TOTAL_TEST_FEATURE_COLUMNS).to_csv(TEST_FEATURES_CSV, index=False)
     
     print(df_test.shape)
