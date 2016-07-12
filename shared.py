@@ -208,4 +208,21 @@ def combine_dataframes(df, products_df, cs_df, median_cust_df, median_cust_produ
     
     # df_test = pd.merge(df_test, demand_cust_week_prod_median_df, on=['Cliente_ID', 'Semana', 'Producto_ID'], how='left')
     # df_test.loc[np.isnan(df_test['Demanda_uni_equil_median_cust_week_prod']), 'Demanda_uni_equil_median_cust_week_prod'] = df_test.loc[np.isnan(df_test['Demanda_uni_equil_median_cust_week_prod']), 'Demanda_uni_equil_median_prod']
+
+
+def load_training_test_df(df_train, df_test, products_df, cs_df):
+
+    # create the meta data using the train set (test must not be used)
+    median_demand = df_train['Demanda_uni_equil'].median()
+    demand_cust_median_df = get_median_cust_demand_df(df_train)
+    demand_cust_prod_median_df = get_median_cust_prod_demand_df(df_train)
+    demand_agen_median_df = get_median_agen_demand_df(df_train)
+    demand_agen_prod_median_df = get_median_agen_prod_demand_df(df_train)
+    demand_cust_prod_agen_median_df = get_median_cust_prod_agen_demand_df(df_train)
+    demand_semana_agen_median_df = get_previous_week_agen_demand_df(df_train)
+    demand_semana_agen_prod_median_df = get_previous_week_agen_prod_demand_df(df_train)
+    
+    # load the dataframes with the new meta data
+    df_train = combine_dataframes(df_train, products_df, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, demand_semana_agen_median_df, demand_semana_agen_prod_median_df, median_demand)
+    df_test = combine_dataframes(df_test, products_df, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, demand_semana_agen_median_df, demand_semana_agen_prod_median_df, median_demand)
     

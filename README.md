@@ -53,7 +53,7 @@ Demand Data:
 * state_encoded
 
 # Notes
-I have gotten no where with the returns information.
+I have gotten no where with the returns information or the sales information.
 
 There may be products in the test set that don't exist in the train set. This is the expected behavior of inventory data, 
 since there are new products being sold all the time. Your model should be able to accommodate this.
@@ -65,14 +65,6 @@ raw data, so it is up to you to decide how to clean up and use this information.
 The adjusted demand (Demanda_uni_equil) is always >= 0 since demand should be either 0 or a 
 positive value. The reason that Venta_uni_hoy - Dev_uni_proxima sometimes has negative values 
 is that the returns records sometimes carry over a few weeks.
-
-Bimbo Ideas -
-Use sklearn label encoder
-Add a new “State” column using the town_state.csv file and the “Agencia_ID”
-Add a new “Product_Type” column using the producto_tabla.csv file. The 2nd to last word is a abbreviation for the company. That information can be used to cluster items.
-Potential new features: avg sales per week per product, avg sale price per product (mean sales / mean units), 
-	avg sales per week per product per customer, avg sales per week per product per route 
-I don't think Semana is very useful on it's own. I think I should try and incorporate temporal information instead of week #
 
 Features - Semana, Agencia_ID, Canal_ID, Ruta_SAK, Cliente_ID, Producto_ID, Bag of Words of the Product, Weight, Food_Company_ID
 
