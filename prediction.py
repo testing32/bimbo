@@ -4,6 +4,13 @@ from sklearn.preprocessing import Imputer
 from sklearn.metrics import fbeta_score, make_scorer
 
 from shared import *
+
+import operator
+import matplotlib
+
+matplotlib.use('Agg')
+from matplotlib import pylab as plt
+
 #from ml_metrics import rmsle
 
 def predict_linear():
@@ -31,11 +38,11 @@ def predict_linear():
     submission.loc[submission['Demanda_uni_equil'] < 0,'Demanda_uni_equil'] = 0
     submission.to_csv(PREDICTION_CSV, index=False, cols=['id', 'Demanda_uni_equil'])
 
-def predict_xgboost():
+def predict_xgboost(display_importance=False):
     
     import xgboost as xgb
     
-    training = pd.read_csv(TRAIN_FEATURES_CSV)
+    training = pd.read_csv(TRAIN_FEATURES_CSV)#, nrows=2000000)
     test = pd.read_csv(TEST_FEATURES_CSV)
     
     # cap the prediction outliers (seems to help with linear, not with xgboost)
@@ -63,6 +70,7 @@ def predict_xgboost():
 
     
     num_boost_round = 150
+    #num_boost_round = 20
     cv_num_round = 2
 
     dtrain = xgb.DMatrix(training[TOTAL_TRAINING_FEATURE_COLUMNS], label=training[TARGET_COLUMN])
@@ -80,9 +88,36 @@ def predict_xgboost():
     submission.loc[submission['Demanda_uni_equil'] < 0,'Demanda_uni_equil'] = 0
     submission.to_csv(PREDICTION_CSV, index=False, cols=['id', 'Demanda_uni_equil'])
 
+    if display_importance:
+        def create_feature_map(features):
+            outfile = open('xgb.fmap', 'w')
+            i = 0
+            for feat in features:
+                outfile.write('{0}\t{1}\tq\n'.format(i, feat))
+                i = i + 1
+        
+            outfile.close()
+
+        create_feature_map(training.columns)
+    
+        importance = xg_classifier.get_fscore(fmap='xgb.fmap')
+        importance = sorted(importance.items(), key=operator.itemgetter(1))
+        
+        df = pd.DataFrame(importance, columns=['feature', 'fscore'])
+        df['fscore'] = df['fscore'] / df['fscore'].sum()
+        
+        
+        plt.figure()
+        df.plot()
+        df.plot(kind='barh', x='feature', y='fscore', legend=False, figsize=(6, 10))
+        plt.title('XGBoost Feature Importance')
+        plt.xlabel('relative importance')
+        plt.gcf().subplots_adjust(left=0.65)
+        plt.gcf().savefig('feature_importance_xgb.png')
+    
 if __name__ == "__main__":
     # predict_linear()
-    predict_xgboost()
+    predict_xgboost(display_importance=True)
     
     sub_df = pd.read_csv(PREDICTION_CSV)
     print(sub_df.shape)

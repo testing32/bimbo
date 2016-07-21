@@ -90,7 +90,7 @@ def predict_xgboost(df_train, df_test):
 
 def predict_train_test(df_train, df_test, model_prediction=predict_linear):
 
-    load_training_test_df(df_train, df_test, products_df, cs_df)
+    df_train, df_test = load_training_test_df(df_train, df_test, products_df, cs_df)
                 
     # cap the prediction to 10
     CAP_PREDICTION_VALUE = 10

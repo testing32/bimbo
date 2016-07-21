@@ -1,4 +1,4 @@
-# bimbo
+# BIMBO
 bimbo kaggle comp
 
 # Feature Engineering Steps
@@ -29,6 +29,8 @@ Demand Data:
 * Include median demand
 * Should I use mean demands on the categories like I'm doing with median demand
 * Combine returns information with the temporal information (returns the previous week, might effect demand for the next week)
+* The # of customers a product is sent to (per state?)
+* The # of agencies a product is sent to (per state?)
 
 # Training Columns
 * Semana

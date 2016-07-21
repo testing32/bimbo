@@ -24,10 +24,12 @@ TRAIN_FEATURES_CSV = DATA_DIR + 'train_features.csv'
 TEST_FEATURES_CSV = DATA_DIR + 'test_features.csv'
 FEATURE_PKL = DATA_DIR + 'features.pkl'
 
-TRAINING_FEATURE_COLUMNS = ['Semana', 'Agencia_ID','Canal_ID', 'Ruta_SAK', 'Cliente_ID', 'Producto_ID', 'Demanda_uni_equil_median', 'Demanda_uni_equil_median_prod','Demanda_uni_equil_median_agen','Demanda_uni_equil_median_prod_agen','Demanda_uni_equil_median_agen_prod','Demanda_uni_equil_median_semana_agen','Demanda_uni_equil_median_semana_agen_prod']
+# unhelpful features: 'Demanda_uni_equil_median_semana_agen','Demanda_uni_equil_median_agen',
+TRAINING_FEATURE_COLUMNS = ['Semana', 'Agencia_ID','Canal_ID', 'Ruta_SAK', 'Cliente_ID', 'Producto_ID', 'Demanda_uni_equil_median','Demanda_uni_equil_median_client', 'Demanda_uni_equil_median_client_prod','Demanda_uni_equil_median_client_prod_agen','Demanda_uni_equil_median_agen_prod','Demanda_uni_equil_median_semana_agen_prod']
+MORE_TRAINING_FEATURES = ['unique_canal_per_agency','unique_canal_per_client','unique_products_per_client','unique_products_per_agency','unique_clients_per_product','unique_agencies_per_product']
 PRODUCT_FEATURE_COLUMNS = ['Producto_ID', 'weight', 'brand_encoded', 'pieces', 'product_group']
 CITY_STATE_FEATURE_COLUMNS = ['city_state_encoded', 'state_encoded']
-TOTAL_TRAINING_FEATURE_COLUMNS = list(set(TRAINING_FEATURE_COLUMNS + ['short_name_encoded',] + PRODUCT_FEATURE_COLUMNS + CITY_STATE_FEATURE_COLUMNS))
+TOTAL_TRAINING_FEATURE_COLUMNS = list(set(TRAINING_FEATURE_COLUMNS + ['short_name_encoded',] + PRODUCT_FEATURE_COLUMNS + CITY_STATE_FEATURE_COLUMNS + MORE_TRAINING_FEATURES))
 TARGET_COLUMN = ['Demanda_uni_equil',]
 TOTAL_TEST_FEATURE_COLUMNS = ['id',] + TOTAL_TRAINING_FEATURE_COLUMNS
 
@@ -59,6 +61,9 @@ def evalerror(preds, dtrain):
     preds = preds.tolist()
     terms_to_sum = [(math.log(labels[i] + 1) - math.log(max(0,preds[i]) + 1)) ** 2.0 for i,pred in enumerate(labels)]
     return 'error', (sum(terms_to_sum) * (1.0/len(preds))) ** 0.5
+
+def calc_log_mean(column):
+    return np.exp(np.mean(np.log(column + 1))) - 1
 
 def analyze_products():
     products  =  pd.read_csv(PRODUCT_CSV)
@@ -135,94 +140,166 @@ def analyze_city_state():
     return cs_df
 
 def get_median_cust_demand_df(df):
-    demand_cust_median_df  = df.groupby(['Cliente_ID',], as_index=False)['Demanda_uni_equil'].median()
-    demand_cust_median_df.columns = ['Cliente_ID','Demanda_uni_equil_median',]
+    demand_cust_median_df  = df.groupby(['Cliente_ID',], as_index=False).Demanda_uni_equil.agg(calc_log_mean)
+    demand_cust_median_df.columns = ['Cliente_ID','Demanda_uni_equil_median_client',]
     return demand_cust_median_df
 
 def get_median_cust_prod_demand_df(df):
-    demand_cust_prod_median_df  = df.groupby(['Cliente_ID','Producto_ID'], as_index=False)['Demanda_uni_equil'].median()
-    demand_cust_prod_median_df.columns = ['Cliente_ID','Producto_ID','Demanda_uni_equil_median_prod',]
+    demand_cust_prod_median_df  = df.groupby(['Cliente_ID','Producto_ID'], as_index=False).Demanda_uni_equil.agg(calc_log_mean)
+    demand_cust_prod_median_df.columns = ['Cliente_ID','Producto_ID','Demanda_uni_equil_median_client_prod',]
     return demand_cust_prod_median_df
 
 def get_median_agen_demand_df(df):
-    demand_agen_median_df  = df.groupby(['Agencia_ID',], as_index=False)['Demanda_uni_equil'].median()
+    demand_agen_median_df  = df.groupby(['Agencia_ID',], as_index=False).Demanda_uni_equil.agg(calc_log_mean)
     demand_agen_median_df.columns = ['Agencia_ID','Demanda_uni_equil_median_agen',]
     return demand_agen_median_df
 
 def get_median_agen_prod_demand_df(df):
-    demand_agen_prod_median_df  = df.groupby(['Agencia_ID','Producto_ID'], as_index=False)['Demanda_uni_equil'].median()
+    demand_agen_prod_median_df  = df.groupby(['Agencia_ID','Producto_ID'], as_index=False).Demanda_uni_equil.agg(calc_log_mean)
     demand_agen_prod_median_df.columns = ['Agencia_ID','Producto_ID','Demanda_uni_equil_median_agen_prod',]
     return demand_agen_prod_median_df
 
 def get_median_cust_prod_agen_demand_df(df):
-    demand_cust_prod_agen_median_df  = df.groupby(['Cliente_ID','Producto_ID', 'Agencia_ID'], as_index=False)['Demanda_uni_equil'].median()
-    demand_cust_prod_agen_median_df.columns = ['Cliente_ID','Producto_ID','Agencia_ID','Demanda_uni_equil_median_prod_agen',]
+    demand_cust_prod_agen_median_df  = df.groupby(['Cliente_ID','Producto_ID', 'Agencia_ID'], as_index=False).Demanda_uni_equil.agg(calc_log_mean)
+    demand_cust_prod_agen_median_df.columns = ['Cliente_ID','Producto_ID','Agencia_ID','Demanda_uni_equil_median_client_prod_agen',]
     return demand_cust_prod_agen_median_df
 
 def get_previous_week_agen_demand_df(df):
-    demand_semana_agen_median_df  = df.groupby(['Semana','Agencia_ID'], as_index=False)['Demanda_uni_equil'].median()
+    demand_semana_agen_median_df  = df.groupby(['Semana','Agencia_ID'], as_index=False).Demanda_uni_equil.agg(calc_log_mean)
     demand_semana_agen_median_df.columns = ['Semana','Agencia_ID','Demanda_uni_equil_median_semana_agen',]
     demand_semana_agen_median_df['Semana'] = demand_semana_agen_median_df['Semana'] + 1
     return  demand_semana_agen_median_df
 
 def get_previous_week_agen_prod_demand_df(df):
-    demand_semana_agen_prod_median_df  = df.groupby(['Semana','Agencia_ID','Producto_ID'], as_index=False)['Demanda_uni_equil'].median()
+    demand_semana_agen_prod_median_df  = df.groupby(['Semana','Agencia_ID','Producto_ID'], as_index=False).Demanda_uni_equil.agg(calc_log_mean)
     demand_semana_agen_prod_median_df.columns = ['Semana','Agencia_ID','Producto_ID','Demanda_uni_equil_median_semana_agen_prod',]
     demand_semana_agen_prod_median_df['Semana'] = demand_semana_agen_prod_median_df['Semana'] + 1
     return  demand_semana_agen_prod_median_df    
 
-def combine_dataframes(df, products_df, cs_df, median_cust_df, median_cust_product_df, get_median_cust_prod_agen_df, median_agen_df, median_agen_product_df, demand_semana_agen_median_df, demand_semana_agen_prod_median_df, median_demand):
+def get_previous_week_client_agen_prod_demand_df(df):
+    demand_semana_client_agen_prod_median_df  = df.groupby(['Semana','Cliente_ID','Agencia_ID','Producto_ID'], as_index=False).Demanda_uni_equil.agg(calc_log_mean)
+    demand_semana_client_agen_prod_median_df.columns = ['Semana','Cliente_ID','Agencia_ID','Producto_ID','Demanda_uni_equil_median_semana_client_agen_prod',]
+    demand_semana_client_agen_prod_median_df['Semana'] = demand_semana_client_agen_prod_median_df['Semana'] + 1
+    return  demand_semana_client_agen_prod_median_df    
+
+def add_unique_frequency_features(train_df, df):
+    
+    new_df = train_df.groupby('Agencia_ID').Canal_ID.nunique().to_frame()
+    new_df.columns = ['unique_canal_per_agency',]
+    new_df['Agencia_ID'] = new_df.index
+    df = pd.merge(df, new_df, on='Agencia_ID', how='left')
+    df['unique_canal_per_agency'] = df['unique_canal_per_agency'].fillna(new_df['unique_canal_per_agency'].median())
+    
+    new_df = train_df.groupby('Cliente_ID').Canal_ID.nunique().to_frame()
+    new_df.columns = ['unique_canal_per_client',]
+    new_df['Cliente_ID'] = new_df.index
+    df = pd.merge(df, new_df, on='Cliente_ID', how='left')
+    df['unique_canal_per_client'] = df['unique_canal_per_client'].fillna(new_df['unique_canal_per_client'].median())
+    
+    new_df = train_df.groupby('Cliente_ID').Producto_ID.nunique().to_frame()
+    new_df.columns = ['unique_products_per_client',]
+    new_df['Cliente_ID'] = new_df.index
+    df = pd.merge(df, new_df, on='Cliente_ID', how='left')
+    df['unique_products_per_client'] = df['unique_products_per_client'].fillna(new_df['unique_products_per_client'].median())
+
+    new_df = train_df.groupby('Agencia_ID').Producto_ID.nunique().to_frame()
+    new_df.columns = ['unique_products_per_agency',]
+    new_df['Agencia_ID'] = new_df.index
+    df = pd.merge(df, new_df, on='Agencia_ID', how='left')
+    df['unique_products_per_agency'] = df['unique_products_per_agency'].fillna(new_df['unique_products_per_agency'].median())
+            
+    new_df = train_df.groupby('Producto_ID').Cliente_ID.nunique().to_frame()
+    new_df.columns = ['unique_clients_per_product',]
+    new_df['Producto_ID'] = new_df.index
+    df = pd.merge(df, new_df, on='Producto_ID', how='left')
+    df['unique_clients_per_product'] = df['unique_clients_per_product'].fillna(new_df['unique_clients_per_product'].median())
+
+    new_df = train_df.groupby('Producto_ID').Agencia_ID.nunique().to_frame()
+    new_df.columns = ['unique_agencies_per_product',]
+    new_df['Producto_ID'] = new_df.index
+    df = pd.merge(df, new_df, on='Producto_ID', how='left')
+    df['unique_agencies_per_product'] = df['unique_agencies_per_product'].fillna(new_df['unique_agencies_per_product'].median())
+    
+    del new_df    
+    return df
+    
+def combine_dataframes(df, products_df, cs_df, median_cust_df, median_cust_product_df, get_median_cust_prod_agen_df, median_agen_product_df, demand_semana_agen_prod_median_df, demand_semana_client_agen_prod_median_df, median_demand):
     #df_train = pd.merge(products_bagofwords, df_train, on='Producto_ID')
     df = pd.merge(products_df.get(PRODUCT_FEATURE_COLUMNS + ['short_name_encoded',]), df, on='Producto_ID')
     df = pd.merge(cs_df.get(CITY_STATE_FEATURE_COLUMNS + ['Agencia_ID',]), df, on='Agencia_ID')
     
+    df['Demanda_uni_equil_median'] = median_demand
+    
     df = pd.merge(df, median_cust_df, on='Cliente_ID', how='left')
-    df['Demanda_uni_equil_median'] = df['Demanda_uni_equil_median'].fillna(median_demand)
+    df['Demanda_uni_equil_median_client'] = df['Demanda_uni_equil_median_client'].fillna(median_demand)
     
     df = pd.merge(df, median_cust_product_df, on=['Cliente_ID', 'Producto_ID'], how='left')
-    df.loc[np.isnan(df['Demanda_uni_equil_median_prod']), 'Demanda_uni_equil_median_prod'] = df.loc[np.isnan(df['Demanda_uni_equil_median_prod']), 'Demanda_uni_equil_median'] 
-    
-    df = pd.merge(df, median_agen_df, on='Agencia_ID', how='left')
-    df['Demanda_uni_equil_median_agen'] = df['Demanda_uni_equil_median_agen'].fillna(median_demand)
+    df.loc[np.isnan(df['Demanda_uni_equil_median_client_prod']), 'Demanda_uni_equil_median_client_prod'] = df.loc[np.isnan(df['Demanda_uni_equil_median_client_prod']), 'Demanda_uni_equil_median_client'] 
     
     df = pd.merge(df, median_agen_product_df, on=['Agencia_ID', 'Producto_ID'], how='left')
-    df.loc[np.isnan(df['Demanda_uni_equil_median_agen_prod']), 'Demanda_uni_equil_median_agen_prod'] = df.loc[np.isnan(df['Demanda_uni_equil_median_agen_prod']), 'Demanda_uni_equil_median_agen']
+    df.loc[np.isnan(df['Demanda_uni_equil_median_agen_prod']), 'Demanda_uni_equil_median_agen_prod'] = df['Demanda_uni_equil_median_agen_prod'].fillna(median_demand)
     
     df = pd.merge(df, get_median_cust_prod_agen_df, on=['Cliente_ID', 'Producto_ID', 'Agencia_ID'], how='left')
-    df.loc[np.isnan(df['Demanda_uni_equil_median_prod_agen']), 'Demanda_uni_equil_median_prod_agen'] = df.loc[np.isnan(df['Demanda_uni_equil_median_prod_agen']), 'Demanda_uni_equil_median_prod'] 
+    df.loc[np.isnan(df['Demanda_uni_equil_median_client_prod_agen']), 'Demanda_uni_equil_median_client_prod_agen'] = df.loc[np.isnan(df['Demanda_uni_equil_median_client_prod_agen']), 'Demanda_uni_equil_median_client_prod'] 
     
+    df = pd.merge(df, demand_semana_agen_prod_median_df, on=['Semana','Agencia_ID','Producto_ID'], how='left')
+    df.loc[np.isnan(df['Demanda_uni_equil_median_semana_agen_prod']), 'Demanda_uni_equil_median_semana_agen_prod'] = df.loc[np.isnan(df['Demanda_uni_equil_median_semana_agen_prod']), 'Demanda_uni_equil_median_agen_prod'] 
+    
+    df = pd.merge(df, demand_semana_client_agen_prod_median_df, on=['Semana','Cliente_ID','Agencia_ID','Producto_ID'], how='left')
+    df.loc[np.isnan(df['Demanda_uni_equil_median_semana_client_agen_prod']), 'Demanda_uni_equil_median_semana_client_agen_prod'] = df.loc[np.isnan(df['Demanda_uni_equil_median_semana_client_agen_prod']), 'Demanda_uni_equil_median_semana_agen_prod'] 
+    
+    """ Unhelpful features
     df = pd.merge(df, demand_semana_agen_median_df, on=['Semana','Agencia_ID'], how='left')
     df.loc[np.isnan(df['Demanda_uni_equil_median_semana_agen']), 'Demanda_uni_equil_median_semana_agen'] = df.loc[np.isnan(df['Demanda_uni_equil_median_semana_agen']), 'Demanda_uni_equil_median_agen'] 
     
-    df = pd.merge(df, demand_semana_agen_prod_median_df, on=['Semana','Agencia_ID','Producto_ID'], how='left')
-    df.loc[np.isnan(df['Demanda_uni_equil_median_semana_agen_prod']), 'Demanda_uni_equil_median_semana_agen_prod'] = df.loc[np.isnan(df['Demanda_uni_equil_median_semana_agen_prod']), 'Demanda_uni_equil_median_semana_agen'] 
+    df = pd.merge(df, median_agen_df, on='Agencia_ID', how='left')
+    df['Demanda_uni_equil_median_agen'] = df['Demanda_uni_equil_median_agen'].fillna(median_demand)
+    """
     
     return df
     
     # df_train = pd.merge(df_train, returns_cust_median_df, on='Cliente_ID')
     
     #df_train = pd.merge(df_train, demand_cust_week_prod_median_df, on=['Cliente_ID', 'Semana', 'Producto_ID'], how='left')
-    #df_train.loc[np.isnan(df_train['Demanda_uni_equil_median_cust_week_prod']), 'Demanda_uni_equil_median_cust_week_prod'] = df_train.loc[np.isnan(df_train['Demanda_uni_equil_median_cust_week_prod']), 'Demanda_uni_equil_median_prod']
+    #df_train.loc[np.isnan(df_train['Demanda_uni_equil_median_cust_week_prod']), 'Demanda_uni_equil_median_cust_week_prod'] = df_train.loc[np.isnan(df_train['Demanda_uni_equil_median_cust_week_prod']), 'Demanda_uni_equil_median_client_prod']
     # df_test = pd.merge(df_test, returns_cust_median_df, on='Cliente_ID', how='left')
     # df_test['Dev_uni_proxima_median'] = df_test['Dev_uni_proxima_median'].fillna(median_returns)
     
     # df_test = pd.merge(df_test, demand_cust_week_prod_median_df, on=['Cliente_ID', 'Semana', 'Producto_ID'], how='left')
-    # df_test.loc[np.isnan(df_test['Demanda_uni_equil_median_cust_week_prod']), 'Demanda_uni_equil_median_cust_week_prod'] = df_test.loc[np.isnan(df_test['Demanda_uni_equil_median_cust_week_prod']), 'Demanda_uni_equil_median_prod']
+    # df_test.loc[np.isnan(df_test['Demanda_uni_equil_median_cust_week_prod']), 'Demanda_uni_equil_median_cust_week_prod'] = df_test.loc[np.isnan(df_test['Demanda_uni_equil_median_cust_week_prod']), 'Demanda_uni_equil_median_client_prod']
 
 
 def load_training_test_df(df_train, df_test, products_df, cs_df):
 
+    df_train = add_unique_frequency_features(df_train, df_train)
+    df_test = add_unique_frequency_features(df_train, df_test)
+
     # create the meta data using the train set (test must not be used)
-    median_demand = df_train['Demanda_uni_equil'].median()
+    median_demand = calc_log_mean(df_train['Demanda_uni_equil'])
     demand_cust_median_df = get_median_cust_demand_df(df_train)
     demand_cust_prod_median_df = get_median_cust_prod_demand_df(df_train)
-    demand_agen_median_df = get_median_agen_demand_df(df_train)
     demand_agen_prod_median_df = get_median_agen_prod_demand_df(df_train)
     demand_cust_prod_agen_median_df = get_median_cust_prod_agen_demand_df(df_train)
-    demand_semana_agen_median_df = get_previous_week_agen_demand_df(df_train)
     demand_semana_agen_prod_median_df = get_previous_week_agen_prod_demand_df(df_train)
+    demand_semana_client_agen_prod_median_df = get_previous_week_client_agen_prod_demand_df(df_train)
     
+    """ Unhelpful Features
+    demand_agen_median_df = get_median_agen_demand_df(df_train)
+    demand_semana_agen_median_df = get_previous_week_agen_demand_df(df_train)
+    """
+    
+    training_df_parts = np.array_split(df_train, 8)
+    
+    augmented_df_parts = []
+    for df_part in training_df_parts:
+        augmented_df_parts.append(combine_dataframes(df_part, products_df, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_prod_median_df, demand_semana_agen_prod_median_df, demand_semana_client_agen_prod_median_df, median_demand))
     # load the dataframes with the new meta data
-    df_train = combine_dataframes(df_train, products_df, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, demand_semana_agen_median_df, demand_semana_agen_prod_median_df, median_demand)
-    df_test = combine_dataframes(df_test, products_df, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, demand_semana_agen_median_df, demand_semana_agen_prod_median_df, median_demand)
+    #df_train = combine_dataframes(df_train, products_df, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_prod_median_df, demand_semana_agen_prod_median_df, demand_semana_client_agen_prod_median_df, median_demand)
+    df_train = pd.concat(augmented_df_parts)
     
+    del augmented_df_parts
+    del training_df_parts
+    
+    df_test = combine_dataframes(df_test, products_df, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_prod_median_df, demand_semana_agen_prod_median_df, demand_semana_client_agen_prod_median_df, median_demand)
+    
+    return df_train, df_test

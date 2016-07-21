@@ -80,10 +80,10 @@ def create_features(load_from_pkl=True):
     
     # get the products dateframe
     if load_from_pkl:
-        products = pd.read_pickle(PRODUCTS_PKL)
+        products_df = pd.read_pickle(PRODUCTS_PKL)
     else:
-        products = analyze_products()
-        products.to_pickle(PRODUCTS_PKL)
+        products_df = analyze_products()
+        products_df.to_pickle(PRODUCTS_PKL)
     
     # get the city/state dataframe
     if load_from_pkl:
@@ -91,26 +91,6 @@ def create_features(load_from_pkl=True):
     else:
         cs_df = analyze_city_state()
         cs_df.to_pickle(CITY_STATE_PKL)
-
-    """
-    # read in s
-    df_train = pd.read_csv(TRAINING_CSV, iterator=True, chunksize=200000)
-    
-    first = True
-    for chunk in df_train:
-        
-        chunk_merge = pd.merge(products, chunk, on='Producto_ID')
-        print(chunk_merge.shape)
-        
-        features = chunk_merge.get(TRAINING_FEATURE_COLUMNS + vectorizer.get_feature_names() + TARGET_COLUMN)
-        print(features.shape)
-        
-        if first:
-            features.to_csv(FEATURE_CSV)
-            first = False
-        else:
-            features.to_csv(FEATURE_CSV, mode='a', header=False)
-    """
     
     # Gets the training data, I'm setting the dtype to use less memory
     df_train = pd.read_csv(TRAINING_CSV, 
@@ -122,55 +102,6 @@ def create_features(load_from_pkl=True):
                   'Producto_ID':'int32',
                   'Demanda_uni_equil':'int32'})
     
-    # calculate the median demand
-    median_demand = df_train['Demanda_uni_equil'].median()
-    
-    # calculate the median demand from a client
-    if load_from_pkl:
-        demand_cust_median_df = pd.read_pickle(FULL_TRAIN_DEMAND_CUST_MEDIAN_PKL)
-    else:
-        demand_cust_median_df  = get_median_cust_demand_df(df_train)
-        demand_cust_median_df.to_pickle(FULL_TRAIN_DEMAND_CUST_MEDIAN_PKL)
-    
-    # calculate the median demand from a client/product
-    if load_from_pkl:
-        demand_cust_prod_median_df = pd.read_pickle(FULL_TRAIN_DEMAND_CUST_PROD_MEDIAN_PKL)
-    else:
-        demand_cust_prod_median_df  = get_median_cust_prod_demand_df(df_train)
-        demand_cust_prod_median_df.to_pickle(FULL_TRAIN_DEMAND_CUST_PROD_MEDIAN_PKL)
-    
-    # calculate the median agency demand
-    demand_agen_median_df = get_median_agen_demand_df(df_train)
-    
-    # calculate the median agency/product/demand
-    demand_agen_prod_median_df = get_median_agen_prod_demand_df(df_train)
-    
-    # calculate the median customer/product/agency/demand
-    demand_cust_prod_agen_median_df = get_median_cust_prod_agen_demand_df(df_train)
-    
-    # calculate the previous weeks agency demand
-    demand_semana_agen_median_df = get_previous_week_agen_demand_df(df_train)
-    
-    # calculate the previous weeks agency/product demand
-    demand_semana_agen_prod_median_df = get_previous_week_agen_prod_demand_df(df_train)
-    
-    """
-    # the median returns doesn't help
-    median_returns = df_train['Dev_uni_proxima'].median()
-    returns_cust_median_df  = df_train.groupby(['Cliente_ID',], as_index=False)['Dev_uni_proxima'].median()
-    returns_cust_median_df.columns = ['Cliente_ID','Dev_uni_proxima_median',] 
-    
-    # this doesn't help either
-    # add sales from previous week information, per customer, per product
-    demand_cust_week_prod_median_df  = df_train.groupby(['Cliente_ID','Semana','Producto_ID'], as_index=False)['Demanda_uni_equil'].median()
-    demand_cust_week_prod_median_df.columns = ['Cliente_ID','Semana','Producto_ID','Demanda_uni_equil_median_cust_week_prod',]
-    demand_cust_week_prod_median_df['Semana'] = demand_cust_week_prod_median_df['Semana'] + 1
-    """
-    
-    # load the dataframes with the new meta data
-    df_train = combine_dataframes(df_train, products, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, demand_semana_agen_median_df, demand_semana_agen_prod_median_df, median_demand)
-    df_train.get(TOTAL_TRAINING_FEATURE_COLUMNS + TARGET_COLUMN).to_csv(TRAIN_FEATURES_CSV, index=False)
-    
     # Gets the test data, I'm setting the dtype to use less memory
     df_test = pd.read_csv(TEST_CSV, 
         dtype  = {'id': 'int32',
@@ -181,8 +112,9 @@ def create_features(load_from_pkl=True):
                   'Cliente_ID':'int32',
                   'Producto_ID':'int32'})
     
-    # create the test set dataframe
-    df_test = combine_dataframes(df_test, products, cs_df, demand_cust_median_df, demand_cust_prod_median_df, demand_cust_prod_agen_median_df, demand_agen_median_df, demand_agen_prod_median_df, demand_semana_agen_median_df, demand_semana_agen_prod_median_df, median_demand)
+    df_train, df_test = load_training_test_df(df_train, df_test, products_df, cs_df)
+    
+    df_train.get(TOTAL_TRAINING_FEATURE_COLUMNS + TARGET_COLUMN).to_csv(TRAIN_FEATURES_CSV, index=False)    
     df_test.get(TOTAL_TEST_FEATURE_COLUMNS).to_csv(TEST_FEATURES_CSV, index=False)
     
     print(df_test.shape)
@@ -216,7 +148,81 @@ def compare_product_lists():
     print(set(missing_products))
     print(len(set(missing_products)))
     
+def group_up_agencies():
+    df_train = pd.read_csv(TRAINING_CSV)#, nrows=2000000)
+    
+    new_df = df_train.groupby('Agencia_ID').Canal_ID.nunique().to_frame()
+    new_df.columns = ['unique_canal_per_agency',]
+    new_df['Agencia_ID'] = new_df.index
+    print(new_df.describe())
+    
+    new_df = df_train.groupby('Cliente_ID').Canal_ID.nunique().to_frame()
+    new_df.columns = ['unique_canal_per_client',]
+    new_df['Cliente_ID'] = new_df.index
+    print(new_df.describe())
+    
+    #df = pd.merge(df_train, new_df, on=['Agencia_ID',])
+    
+    """ very low std
+    new_df = df_train.groupby('Cliente_ID').Agencia_ID.nunique().to_frame()
+    new_df.columns = ['unique_agencia_per_client',]
+    new_df['Cliente_ID'] = new_df.index
+    print(new_df.describe())
+    
+    new_df = df_train.groupby('Agencia_ID').Cliente_ID.nunique().to_frame()
+    new_df.columns = ['unique_clients_per_agency',]
+    new_df['Agencia_ID'] = new_df.index
+    print(new_df.describe())
+    """
+    
+    new_df = df_train.groupby('Cliente_ID').Producto_ID.nunique().to_frame()
+    new_df.columns = ['unique_products_per_client',]
+    new_df['Cliente_ID'] = new_df.index
+    print(new_df.describe())
 
+    new_df = df_train.groupby('Agencia_ID').Producto_ID.nunique().to_frame()
+    new_df.columns = ['unique_products_per_agency',]
+    new_df['Agencia_ID'] = new_df.index
+    print(new_df.describe())
+            
+    new_df = df_train.groupby('Producto_ID').Cliente_ID.nunique().to_frame()
+    new_df.columns = ['unique_clients_per_product',]
+    new_df['Producto_ID'] = new_df.index
+    print(new_df.describe())
+
+    new_df = df_train.groupby('Producto_ID').Agencia_ID.nunique().to_frame()
+    new_df.columns = ['unique_agencies_per_product',]
+    new_df['Producto_ID'] = new_df.index
+    print(new_df.describe())
+
+def log_mean():
+    df_train = pd.read_csv(TRAINING_CSV, nrows=9000000)
+    
+    log_result = np.log(df_train['Demanda_uni_equil'] + 1)
+    mean_result = np.mean(log_result)
+    log_mean = exp_result = np.exp(mean_result) - 1
+
+    df_train['log_mean'] = log_mean
+
+    mean = df_train['Demanda_uni_equil'].mean()    
+    df_train['mean'] = mean
+    
+    median = df_train['Demanda_uni_equil'].median()
+    df_train['median'] = median
+    
+    print(evalerror2(df_train['log_mean'], df_train['Demanda_uni_equil']))
+    print(evalerror2(df_train['mean'], df_train['Demanda_uni_equil']))
+    print(evalerror2(df_train['median'], df_train['Demanda_uni_equil']))
+
+def get_log_mean_right():
+    df = pd.read_csv(TRAINING_CSV, nrows=200000)
+    
+    demand_agen_median_df  = df.groupby(['Agencia_ID',], as_index=False)['Demanda_uni_equil'].median()
+    demand_agen_median_df.columns = ['Agencia_ID','Demanda_uni_equil_median_agen',]
+    
+    demand_agen_log_mean_df = df.groupby(['Agencia_ID',], as_index=False).Demanda_uni_equil.agg(calc_log_mean)
+    demand_agen_log_mean_df.columns = ['Agencia_ID','Demanda_uni_equil_log_mean_agen',]
+    
 if __name__ == "__main__":
     #list_files()
     #train_test_analyze()
@@ -229,4 +235,7 @@ if __name__ == "__main__":
     #test_pd()
     #compare_product_lists()
     
-    create_features(load_from_pkl=False)
+    create_features()
+    #group_up_agencies()
+    
+    #get_log_mean_right()
