@@ -7,7 +7,7 @@ from shared import *
 
 import operator
 import matplotlib
-from sklearn.preprocessing.data import MinMaxScaler
+from sklearn.preprocessing.data import MinMaxScaler, StandardScaler
 
 matplotlib.use('Agg')
 from matplotlib import pylab as plt
@@ -42,16 +42,15 @@ def predict_linear():
 def predict_xgboost(display_importance=False):
     
     import xgboost as xgb
-    
-    scalar = MinMaxScaler()
-    
+        
     training = pd.read_csv(TRAIN_FEATURES_CSV)#, nrows=2000000)
     test = pd.read_csv(TEST_FEATURES_CSV)
     
     # normalize the values
     for column in TOTAL_TRAINING_FEATURE_COLUMNS:
-        training[column] = training[column].apply(lambda x: scalar.fit_transform(x))
-        test[column] = test[column].apply(lambda x: scalar.transform(x))
+        scalar = StandardScaler()
+        training[column] = scalar.fit_transform(training[column])
+        test[column] = scalar.transform(test[column])
     
     # cap the prediction outliers (seems to help with linear, not with xgboost)
     #CAP_PREDICTION_VALUE = 10

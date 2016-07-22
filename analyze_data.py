@@ -44,6 +44,17 @@ def train_test_analyze():
     nl()
     print(df_train.head())
 
+def test_scalar():
+    from sklearn.preprocessing.data import MinMaxScaler, StandardScaler
+    scalar = StandardScaler()
+    
+    training = pd.read_csv(TRAIN_FEATURES_CSV, nrows=200000)
+    test = pd.read_csv(TEST_FEATURES_CSV)
+    
+    # normalize the values
+    for column in TOTAL_TRAINING_FEATURE_COLUMNS:
+        training[column] = scalar.fit_transform(training[column])
+        test[column] = scalar.transform(test[column])
 
 def get_product_agg(df_train, cols):
     agg  = df_train.groupby(['Semana', 'Producto_ID'], as_index=False).agg(['count','sum', 'min', 'max','median','mean'])
@@ -235,7 +246,8 @@ if __name__ == "__main__":
     #test_pd()
     #compare_product_lists()
     
-    create_features()
+    #create_features()
     #group_up_agencies()
     
     #get_log_mean_right()
+    test_scalar()
