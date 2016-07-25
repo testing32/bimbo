@@ -11,6 +11,8 @@ from nltk.stem.snowball import SnowballStemmer
 from nltk.tokenize import WhitespaceTokenizer
 from nltk.corpus import wordnet
 
+RANDOM_STATE = 47
+
 DATA_DIR = 'data/'
 RESULTS_DIR = 'results/'
 PRODUCT_CSV = DATA_DIR + 'producto_tabla.csv'
@@ -30,7 +32,7 @@ MORE_TRAINING_FEATURES = ['unique_canal_per_agency','unique_canal_per_client','u
 PRODUCT_FEATURE_COLUMNS = ['Producto_ID', 'weight', 'brand_encoded', 'pieces', 'product_group']
 CITY_STATE_FEATURE_COLUMNS = ['city_state_encoded', 'state_encoded']
 TOTAL_TRAINING_FEATURE_COLUMNS = list(set(TRAINING_FEATURE_COLUMNS + ['short_name_encoded',] + PRODUCT_FEATURE_COLUMNS + CITY_STATE_FEATURE_COLUMNS + MORE_TRAINING_FEATURES))
-TARGET_COLUMN = ['Demanda_uni_equil',]
+TARGET_COLUMN = 'Demanda_uni_equil'
 TOTAL_TEST_FEATURE_COLUMNS = ['id',] + TOTAL_TRAINING_FEATURE_COLUMNS
 
 PRODUCTS_PKL = DATA_DIR + 'products.pkl'

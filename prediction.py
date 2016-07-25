@@ -1,13 +1,16 @@
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import Imputer
-
-from sklearn.metrics import fbeta_score, make_scorer
+import operator
+import matplotlib
+import pickle
 
 from shared import *
 
-import operator
-import matplotlib
+from XGBoostSKLearnWrapper import *
+from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor, GradientBoostingRegressor
 from sklearn.preprocessing.data import MinMaxScaler, StandardScaler
+from sklearn.cross_validation import train_test_split, StratifiedKFold, StratifiedShuffleSplit, KFold
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import Imputer
+from sklearn.metrics import fbeta_score, make_scorer
 
 matplotlib.use('Agg')
 from matplotlib import pylab as plt
@@ -46,11 +49,13 @@ def predict_xgboost(display_importance=False):
     training = pd.read_csv(TRAIN_FEATURES_CSV)#, nrows=2000000)
     test = pd.read_csv(TEST_FEATURES_CSV)
     
+    """ DOESN'T HELP
     # normalize the values
     for column in TOTAL_TRAINING_FEATURE_COLUMNS:
         scalar = StandardScaler()
         training[column] = scalar.fit_transform(training[column])
         test[column] = scalar.transform(test[column])
+    """
     
     # cap the prediction outliers (seems to help with linear, not with xgboost)
     #CAP_PREDICTION_VALUE = 10
@@ -73,8 +78,7 @@ def predict_xgboost(display_importance=False):
           "thread": -1,
           "nthread": 20,
           "seed": 1301
-          } # 0.873502225    0.946107784    0.580526638    0.719544592
-
+          }
     
     num_boost_round = 150
     #num_boost_round = 20
@@ -122,11 +126,147 @@ def predict_xgboost(display_importance=False):
         plt.gcf().subplots_adjust(left=0.65)
         plt.gcf().savefig('feature_importance_xgb.png')
     
+def stacked_gen():
+    
+    n_folds = 10
+    verbose = True
+    shuffle = False
+
+    print("Loading Data")
+    training = pd.read_csv(TRAIN_FEATURES_CSV)#, nrows=20000)
+    test = pd.read_csv(TEST_FEATURES_CSV)#, nrows=200)
+    print("Data Loaded")
+        
+    # calculate the number of trees
+    num_trees = min(1000, int(0.3*len(training)))
+    
+    skf = list(KFold(len(training), n_folds, shuffle=True, random_state=RANDOM_STATE))
+    
+    params_1 = {"objective": "reg:linear",
+          "booster" : "gbtree",
+          'eval_metric': 'ndcg',
+          'lambda': 1,
+          'alpha': 0,
+          "eta": 0.015,
+          "gamma": .5,
+          "max_depth": 4,
+          "subsample": 0.7,
+          "colsample_bytree": 0.4,
+          "min_child_weight": 20,
+          "silent": 1,
+          "thread": -1,
+          "nthread": 20,
+          "seed": 1301
+          } # No LDA
+    
+    params_2 = {"objective": "reg:linear",
+          "booster" : "gblinear",
+          'eval_metric': 'ndcg',
+          'lambda': 1,
+          'alpha': 0,
+          "eta": 0.015,
+          "gamma": .5,
+          "max_depth": 4,
+          "subsample": 0.7,
+          "colsample_bytree": 0.4,
+          "min_child_weight": 20,
+          "silent": 1,
+          "thread": -1,
+          "nthread": 20,
+          "seed": 1301
+          } 
+ 
+    params_3 = {"objective": "reg:linear",
+          "booster" : "gbtree",
+          # 'eval_metric': 'ndcg',
+          'lambda': 1,
+          'alpha': 0,
+          "eta": 0.01,
+          "gamma": .5,
+          "max_depth": 4,
+          "subsample": 0.7,
+          "colsample_bytree": 0.4,
+          "min_child_weight": 7,
+          "silent": 1,
+          "thread": -1,
+          "nthread": 20,
+          "seed": 1301
+          }
+    
+    num_boost_round = 150
+    
+    clfs = [XGBoostRegressionSKLearnWrapper(params_1, boost_rounds=num_boost_round),
+            XGBoostRegressionSKLearnWrapper(params_2, boost_rounds=num_boost_round),
+            XGBoostRegressionSKLearnWrapper(params_2, boost_rounds=num_boost_round),
+            RandomForestRegressor(n_estimators=num_trees, max_features='log2', n_jobs=-1, max_depth=53, random_state=RANDOM_STATE),
+            ExtraTreesRegressor(n_estimators=num_trees, max_features='log2', n_jobs=-1, max_depth=130, random_state=RANDOM_STATE),
+            LinearRegression(),]
+    
+    dataset_blend_train = np.zeros((len(training), len(clfs)))
+    dataset_blend_test = np.zeros((len(test), len(clfs)))
+    
+    for j, clf in enumerate(clfs):
+    
+        print(str(j) + " " + str(clf))
+        dataset_blend_test_j = np.zeros((len(test), len(skf)))
+        for i, (kf_train, kf_test) in enumerate(skf):
+            print("Fold " + str(i))
+            X_train = training.iloc[kf_train]
+            X_test = training.iloc[kf_test]
+            clf.fit(X_train[TOTAL_TRAINING_FEATURE_COLUMNS].values, X_train[TARGET_COLUMN])
+            y_submission = clf.predict(X_test[TOTAL_TRAINING_FEATURE_COLUMNS].values)
+            dataset_blend_train[kf_test, j] = y_submission
+            dataset_blend_test_j[:, i] = clf.predict(test[TOTAL_TRAINING_FEATURE_COLUMNS].values)
+        dataset_blend_test[:,j] = dataset_blend_test_j.mean(1)
+        
+    pickle.dump(dataset_blend_train, open(RESULTS_DIR + "x_train_blended.pkl", "wb"))
+    pickle.dump(dataset_blend_test, open(RESULTS_DIR + "x_test_blended.pkl", "wb"))
+
+    import xgboost as xgb
+    
+    params = {"objective": "reg:linear",
+          "booster" : "gbtree",
+          # 'eval_metric': 'ndcg',
+          'lambda': 1,
+          'alpha': 0,
+          "eta": 0.01,
+          "gamma": .5,
+          "max_depth": 4,
+          "subsample": 0.7,
+          "colsample_bytree": 0.4,
+          "min_child_weight": 7,
+          "silent": 1,
+          "thread": -1,
+          "nthread": 20,
+          "seed": 1301
+          }
+    
+    num_boost_round = 150
+    cv_num_round = 2
+
+    dtrain = xgb.DMatrix(dataset_blend_train, label=training[TARGET_COLUMN])
+    dtest = xgb.DMatrix(dataset_blend_test)
+    
+    test_preds = np.zeros(test.shape[0])    
+    watchlist  = [(dtrain,'train')]
+    
+    xg_classifier = xgb.train(params, dtrain, num_boost_round, watchlist, feval=evalerror, early_stopping_rounds=20, verbose_eval=10)
+    predictions = xg_classifier.predict(dtest, ntree_limit=xg_classifier.best_iteration)
+    
+    #print ('RMSLE Score:', rmsle(y_test, preds))
+    
+    submission = pd.DataFrame({"id":test['id'], "Demanda_uni_equil": predictions})
+    submission.loc[submission['Demanda_uni_equil'] < 0,'Demanda_uni_equil'] = 0
+    submission.to_csv(PREDICTION_CSV, index=False, cols=['id', 'Demanda_uni_equil'])
+        
 if __name__ == "__main__":
     # predict_linear()
-    predict_xgboost(display_importance=True)
+    #predict_xgboost(display_importance=True)
+    stacked_gen()
     
+    """
     sub_df = pd.read_csv(PREDICTION_CSV)
     print(sub_df.shape)
     print(sub_df.isnull().sum())
     print(sub_df.describe())
+    """

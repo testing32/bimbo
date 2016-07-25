@@ -26,6 +26,11 @@ N_FOLDS = 5
 RANDOM_STATE = 451
 
 def predict_linear(df_train, df_test):
+    
+    # cap the prediction to 10
+    CAP_PREDICTION_VALUE = 10
+    df_train.loc[df_train[TARGET_COLUMN[0]] > CAP_PREDICTION_VALUE, TARGET_COLUMN[0]] = CAP_PREDICTION_VALUE
+    
     # train the classifier
     clf = LinearRegression()
     clf.fit(df_train[TOTAL_TRAINING_FEATURE_COLUMNS], df_train[TARGET_COLUMN])
@@ -48,8 +53,8 @@ def predict_xgboost(df_train, df_test):
     test = pd.read_csv(TEST_FEATURES_CSV)
     
     # cap the prediction outliers (seems to help)
-    CAP_PREDICTION_VALUE = 10
-    training.loc[training[TARGET_COLUMN[0]] > CAP_PREDICTION_VALUE, TARGET_COLUMN[0]] = CAP_PREDICTION_VALUE
+    #CAP_PREDICTION_VALUE = 10
+    #training.loc[training[TARGET_COLUMN[0]] > CAP_PREDICTION_VALUE, TARGET_COLUMN[0]] = CAP_PREDICTION_VALUE
     
     # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1729)
     
@@ -91,11 +96,7 @@ def predict_xgboost(df_train, df_test):
 def predict_train_test(df_train, df_test, model_prediction=predict_linear):
 
     df_train, df_test = load_training_test_df(df_train, df_test, products_df, cs_df)
-                
-    # cap the prediction to 10
-    CAP_PREDICTION_VALUE = 10
-    df_train.loc[df_train[TARGET_COLUMN[0]] > CAP_PREDICTION_VALUE, TARGET_COLUMN[0]] = CAP_PREDICTION_VALUE
-    
+                    
     model_prediction(df_train, df_test)
     
     
@@ -142,7 +143,7 @@ if __name__ == "__main__":
     kf = KFold(n=df.shape[0], n_folds=N_FOLDS, shuffle=True, random_state=RANDOM_STATE)
     for train_indices, test_indices in kf:
         # split the df into train/test and predict
-        predict_train_test(df.iloc[train_indices], df.iloc[test_indices])
+        predict_train_test(df.iloc[train_indices], df.iloc[test_indices], model_prediction=predict_xgboost)
         
         # I'm only doing this once because the folds are so close to the same values
         break        

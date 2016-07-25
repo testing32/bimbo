@@ -1,6 +1,26 @@
 import numpy as np
 
-class XGBoostSKLearnWrapper():
+class XGBoostRegressionSKLearnWrapper():
+    
+    def __init__(self, params, boost_rounds=2000):
+        self.params = params
+        self.boost_rounds = boost_rounds
+        
+    def fit(self, x, y):
+        import xgboost as xgb
+        y = [float(value) for value in y]
+        dtrain = xgb.DMatrix(x, label=y)
+        watchlist  = [(dtrain,'train')]
+        
+        self.clf = xgb.train(self.params, dtrain, self.boost_rounds, watchlist, verbose_eval=False)
+
+    def predict(self, x):
+        import xgboost as xgb
+        return self.clf.predict(xgb.DMatrix(x))
+
+
+
+class XGBoostClassifierSKLearnWrapper():
     
     def __init__(self, params, boost_rounds=2000):
         self.params = params
