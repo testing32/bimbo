@@ -129,19 +129,7 @@ def predict_xgboost(display_importance=False):
 def stacked_gen():
     
     n_folds = 10
-    verbose = True
-    shuffle = False
 
-    print("Loading Data")
-    training = pd.read_csv(TRAIN_FEATURES_CSV)#, nrows=20000)
-    test = pd.read_csv(TEST_FEATURES_CSV)#, nrows=200)
-    print("Data Loaded")
-        
-    # calculate the number of trees
-    num_trees = min(1000, int(0.3*len(training)))
-    
-    skf = list(KFold(len(training), n_folds, shuffle=True, random_state=RANDOM_STATE))
-    
     params_1 = {"objective": "reg:linear",
           "booster" : "gbtree",
           'eval_metric': 'ndcg',
@@ -195,32 +183,67 @@ def stacked_gen():
     
     num_boost_round = 150
     
-    clfs = [XGBoostRegressionSKLearnWrapper(params_1, boost_rounds=num_boost_round),
-            XGBoostRegressionSKLearnWrapper(params_2, boost_rounds=num_boost_round),
-            XGBoostRegressionSKLearnWrapper(params_2, boost_rounds=num_boost_round),
-            RandomForestRegressor(n_estimators=num_trees, max_features='log2', n_jobs=-1, max_depth=53, random_state=RANDOM_STATE),
-            ExtraTreesRegressor(n_estimators=num_trees, max_features='log2', n_jobs=-1, max_depth=130, random_state=RANDOM_STATE),
-            LinearRegression(),]
+    print("Loading Test Data")    
+    test = pd.read_csv(TEST_FEATURES_CSV)#, nrows=200)
+    test[TOTAL_TRAINING_FEATURE_COLUMNS] = test[TOTAL_TRAINING_FEATURE_COLUMNS].astype('float32')
+    print("Test Data Loaded")
     
-    dataset_blend_train = np.zeros((len(training), len(clfs)))
-    dataset_blend_test = np.zeros((len(test), len(clfs)))
-    
-    for j, clf in enumerate(clfs):
-    
-        print(str(j) + " " + str(clf))
-        dataset_blend_test_j = np.zeros((len(test), len(skf)))
-        for i, (kf_train, kf_test) in enumerate(skf):
-            print("Fold " + str(i))
-            X_train = training.iloc[kf_train]
-            X_test = training.iloc[kf_test]
-            clf.fit(X_train[TOTAL_TRAINING_FEATURE_COLUMNS].values, X_train[TARGET_COLUMN])
-            y_submission = clf.predict(X_test[TOTAL_TRAINING_FEATURE_COLUMNS].values)
-            dataset_blend_train[kf_test, j] = y_submission
-            dataset_blend_test_j[:, i] = clf.predict(test[TOTAL_TRAINING_FEATURE_COLUMNS].values)
-        dataset_blend_test[:,j] = dataset_blend_test_j.mean(1)
+    i=1
+    chunk_size = 4636279 * 2 # (splits training into 8 equal groups)
+    for chunk in pd.read_csv(RANDOMIZED_TRAIN_FEATURES_CSV, chunksize=chunk_size):
+        print("Loading Train Data " + str(i))
         
-    pickle.dump(dataset_blend_train, open(RESULTS_DIR + "x_train_blended.pkl", "wb"))
-    pickle.dump(dataset_blend_test, open(RESULTS_DIR + "x_test_blended.pkl", "wb"))
+        chunk[TOTAL_TRAINING_FEATURE_COLUMNS] = chunk[TOTAL_TRAINING_FEATURE_COLUMNS].astype('float32')
+        chunk[TARGET_COLUMN] = chunk[TARGET_COLUMN].astype('int32')
+            
+        print("Train Data " + str(i) + " Loaded")
+            
+        # calculate the number of trees
+        num_trees = min(1000, int(0.3*len(chunk)))
+        
+        skf = list(KFold(len(chunk), n_folds, shuffle=False, random_state=RANDOM_STATE))
+        
+        clfs = [XGBoostRegressionSKLearnWrapper(params_1, boost_rounds=num_boost_round),
+                XGBoostRegressionSKLearnWrapper(params_2, boost_rounds=num_boost_round),
+                XGBoostRegressionSKLearnWrapper(params_2, boost_rounds=num_boost_round),
+                #RandomForestRegressor(n_estimators=num_trees, max_features='log2', n_jobs=-1, max_depth=53, random_state=RANDOM_STATE),
+                #ExtraTreesRegressor(n_estimators=num_trees, max_features='log2', n_jobs=-1, max_depth=130, random_state=RANDOM_STATE),
+                LinearRegression(),]
+        
+        dataset_blend_train = np.zeros((len(chunk), len(clfs)))
+        dataset_blend_test = np.zeros((len(test), len(clfs)))
+        
+        for j, clf in enumerate(clfs):
+        
+            print(str(j) + " " + str(clf))
+            dataset_blend_test_j = np.zeros((len(test), len(skf)))
+            for i, (kf_train, kf_test) in enumerate(skf):
+                print("Fold " + str(i))
+                X_train = chunk.iloc[kf_train]
+                X_test = chunk.iloc[kf_test]
+                clf.fit(X_train[TOTAL_TRAINING_FEATURE_COLUMNS].values, X_train[TARGET_COLUMN])
+                y_submission = clf.predict(X_test[TOTAL_TRAINING_FEATURE_COLUMNS].values)
+                dataset_blend_train[kf_test, j] = y_submission
+                dataset_blend_test_j[:, i] = clf.predict(test[TOTAL_TRAINING_FEATURE_COLUMNS].values)
+            dataset_blend_test[:,j] = dataset_blend_test_j.mean(1)
+            
+        pickle.dump(dataset_blend_train, open(RESULTS_DIR + "x_train_blended_" + str(i) + ".pkl", "wb"))
+        pickle.dump(dataset_blend_test, open(RESULTS_DIR + "x_test_blended_" + str(i) + ".pkl", "wb"))
+
+def stacked_gen_phase2():
+
+    phase1_train_results = []
+    phase1_test_results = []
+
+    for i in range(1, 17):
+        phase1_train_results.append(pickle.load(open(RESULTS_DIR + "x_train_blended_" + str(i) + ".pkl", "rb")))
+        phase1_test_results.append(pickle.load(open(RESULTS_DIR + "x_test_blended_" + str(i) + ".pkl", "rb")))
+
+    dataset_blend_train = np.vstack(phase1_train_results)
+    dataset_blend_test = np.vstack(phase1_test_results)
+
+    training_labels_df = pd.read_csv(RANDOMIZED_TRAIN_FEATURES_CSV, usecols=['Demanda_uni_equil',])
+    test_ids_df = pd.read_csv(TEST_FEATURES_CSV, usecols=['id',])
 
     import xgboost as xgb
     
@@ -241,23 +264,25 @@ def stacked_gen():
           "seed": 1301
           }
     
-    num_boost_round = 150
     cv_num_round = 2
 
-    dtrain = xgb.DMatrix(dataset_blend_train, label=training[TARGET_COLUMN])
+    dtrain = xgb.DMatrix(dataset_blend_train, label=training_labels_df[TARGET_COLUMN])
     dtest = xgb.DMatrix(dataset_blend_test)
     
-    test_preds = np.zeros(test.shape[0])    
+    test_preds = np.zeros(dataset_blend_test.shape[0])    
     watchlist  = [(dtrain,'train')]
+    
+    num_boost_round = 150
     
     xg_classifier = xgb.train(params, dtrain, num_boost_round, watchlist, feval=evalerror, early_stopping_rounds=20, verbose_eval=10)
     predictions = xg_classifier.predict(dtest, ntree_limit=xg_classifier.best_iteration)
     
     #print ('RMSLE Score:', rmsle(y_test, preds))
     
-    submission = pd.DataFrame({"id":test['id'], "Demanda_uni_equil": predictions})
+    submission = pd.DataFrame({"id":test_ids_df['id'], "Demanda_uni_equil": predictions})
     submission.loc[submission['Demanda_uni_equil'] < 0,'Demanda_uni_equil'] = 0
     submission.to_csv(PREDICTION_CSV, index=False, cols=['id', 'Demanda_uni_equil'])
+    
         
 if __name__ == "__main__":
     # predict_linear()

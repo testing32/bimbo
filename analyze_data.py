@@ -130,6 +130,10 @@ def create_features(load_from_pkl=True):
     
     print(df_test.shape)
 
+def randomize_feature_rows():
+    train_df = pd.read_csv(TRAIN_FEATURES_CSV)
+    train_df = train_df.iloc[np.random.permutation(len(train_df))]
+    train_df.to_csv(RANDOMIZED_TRAIN_FEATURES_CSV, index=False)   
 
 def test_pd():
     client_one  =  pd.read_csv(CLIENT_CSV)
@@ -236,7 +240,7 @@ def get_log_mean_right():
     
 if __name__ == "__main__":
     #list_files()
-    #train_test_analyze()
+    train_test_analyze()
     #view_train_rows()
     #view_target()
     #train_analysis()
@@ -250,4 +254,5 @@ if __name__ == "__main__":
     #group_up_agencies()
     
     #get_log_mean_right()
-    test_scalar()
+    #test_scalar()
+    #randomize_feature_rows()

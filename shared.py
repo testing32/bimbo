@@ -23,6 +23,7 @@ TEST_CSV = DATA_DIR + 'test.csv'
 PREDICTION_CSV = RESULTS_DIR + 'submission.csv' 
 
 TRAIN_FEATURES_CSV = DATA_DIR + 'train_features.csv'
+RANDOMIZED_TRAIN_FEATURES_CSV = DATA_DIR + 'random_train_features.csv'
 TEST_FEATURES_CSV = DATA_DIR + 'test_features.csv'
 FEATURE_PKL = DATA_DIR + 'features.pkl'
 
