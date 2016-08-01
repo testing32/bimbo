@@ -239,9 +239,14 @@ def stacked_gen_phase2():
         phase1_train_results.append(pickle.load(open(RESULTS_DIR + "x_train_blended_" + str(i) + ".pkl", "rb")))
         phase1_test_results.append(pickle.load(open(RESULTS_DIR + "x_test_blended_" + str(i) + ".pkl", "rb")))
 
-    dataset_blend_train = np.vstack(phase1_train_results)
-    dataset_blend_test = np.vstack(phase1_test_results)
-
+    dataset_blend_train = np.hstack(phase1_train_results)
+    
+    # average each cell together
+    dataset_blend_test = phase1_test_results[0]
+    for df in phase1_test_results[1:]:
+        dataset_blend_test = dataset_blend_test.add(df)
+    dataset_blend_test = dataset_blend_test.divide(float(len(phase1_test_results)))
+    
     training_labels_df = pd.read_csv(RANDOMIZED_TRAIN_FEATURES_CSV, usecols=['Demanda_uni_equil',])
     test_ids_df = pd.read_csv(TEST_FEATURES_CSV, usecols=['id',])
 
